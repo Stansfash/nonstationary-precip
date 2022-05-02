@@ -20,7 +20,7 @@ def func(x):
 
 class SparseGPR(gpytorch.models.ExactGP):
 
-    def __init__(self, train_x, train_y, likelihood, Z_init):
+    def __init__(self, train_x, train_y, likelihood, Z_init, kernel):
 
         """The sparse GP class for regression with the collapsed bound.
            q*(u) is implicit.
@@ -32,7 +32,7 @@ class SparseGPR(gpytorch.models.ExactGP):
         self.num_inducing = len(Z_init)
         self.likelihood = likelihood
         self.mean_module = ZeroMean()
-        self.base_covar_module = ScaleKernel(RBFKernel(ard_num_dims = self.train_x.shape[-1]))
+        self.base_covar_module = kernel
         self.covar_module = InducingPointKernel(self.base_covar_module, inducing_points=Z_init, likelihood=self.likelihood)
 
     def forward(self, x):
@@ -65,7 +65,7 @@ class SparseGPR(gpytorch.models.ExactGP):
                   loss = -self.elbo(output, self.train_y)
               losses.append(loss.item())
               loss.backward()
-              if j%1000 == 0:
+              if j%50 == 0:
                         print('Iter %d/%d - Loss: %.3f   outputscale: %.3f  lengthscale: %s   noise: %.3f ' % (
                         j + 1, max_steps, loss.item(),
                         self.base_covar_module.outputscale.item(),
