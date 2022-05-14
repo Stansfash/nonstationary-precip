@@ -21,7 +21,7 @@ import numpy as np
 from math import floor
 import pandas as pd
 
-import sgpr as sgpr
+import SGP.sgpr as sgpr
 
 data_df = pd.read_csv('khyber_2000_2010_tp.csv')
 
@@ -57,6 +57,7 @@ likelihood = gpytorch.likelihoods.GaussianLikelihood()
 model = sgpr.SparseGPR(train_x, train_y, likelihood, Z_init, custom_kernel)
 
 optimizer = torch.optim.Adam(model.parameters(), lr=0.05)
+
 
 # Train
 with gpytorch.settings.cholesky_jitter(1e-1):

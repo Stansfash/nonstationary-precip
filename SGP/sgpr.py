@@ -65,7 +65,7 @@ class SparseGPR(gpytorch.models.ExactGP):
                   loss = -self.elbo(output, self.train_y)
               losses.append(loss.item())
               loss.backward()
-              if j%50 == 0:
+              if j%10 == 0:
                         print('Iter %d/%d - Loss: %.3f   outputscale: %.3f  lengthscale: %s   noise: %.3f ' % (
                         j + 1, max_steps, loss.item(),
                         self.base_covar_module.outputscale.item(),

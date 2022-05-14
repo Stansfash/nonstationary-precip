@@ -5,7 +5,7 @@ import urllib.request
 import os
 from math import floor
 import pandas as pd
-import dgps as dgps
+import DGP.dgps as dgps
 from gpytorch.mlls import VariationalELBO, AddedLossTerm
 from torch.utils.data import TensorDataset, DataLoader
 from gpytorch.mlls import DeepApproximateMLL

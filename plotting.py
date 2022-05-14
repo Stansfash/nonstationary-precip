@@ -51,7 +51,8 @@ def facetgrid_plot(filepath='khyber_2000_2010_tp.csv'):
     fig = plt.figure()
     g = ds.tp.plot(col='time', col_wrap=4, cbar_kwargs={
             "label": "Precipitation [mm/day]",
-            "extend": "neither"})
+            "extend": "neither"}, subplot_kws={
+            "projection": ccrs.LambertConformal()})
     g.set_xlabels('Longitude °E')
     g.set_ylabels('Latitude °N')
     g.set_titles('{coord} : {value}')
