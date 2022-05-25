@@ -5,7 +5,7 @@ import urllib.request
 import os
 from math import floor
 import pandas as pd
-import DGP.dgps as dgps
+import dgps as dgps
 from gpytorch.mlls import VariationalELBO, AddedLossTerm
 from torch.utils.data import TensorDataset, DataLoader
 from gpytorch.mlls import DeepApproximateMLL
@@ -33,7 +33,7 @@ train_loader = DataLoader(train_dataset, batch_size=1024, shuffle=True)
 
 
 #### Model 
-model = dgps.DeepGP3(train_x.shape)
+model = dgps.DeepGP5(train_x.shape)
 
 if torch.cuda.is_available():
     model = model.cuda()
@@ -89,6 +89,6 @@ print(f"RMSE: {rmse.item()}, NLPD: {nlpd.item()}")
 
 df1 = pd.DataFrame()
 df1['pred'] = predictive_means.mean(axis=0)
-df1['lat'] = data[:394,3]
-df1['lon'] = data[:394,2]
+df1['lat'] = data[:394,1]
+df1['lon'] = data[:394,0]
 df1.to_csv('DGP3_10samples_uib_jan2000.csv')
