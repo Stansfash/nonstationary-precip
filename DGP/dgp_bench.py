@@ -86,3 +86,9 @@ rmse = sqrt_mean_squared_error(test_y, predictive_means)
 nlpd = negative_log_predictive_density(test_y, predictive_means, predictive_variances)
 
 print(f"RMSE: {rmse.item()}, NLPD: {nlpd.item()}")
+
+df1 = pd.DataFrame()
+df1['pred'] = predictive_means.mean(axis=0)
+df1['lat'] = data[:394,3]
+df1['lon'] = data[:394,2]
+df1.to_csv('DGP3_10samples_uib_jan2000.csv')
