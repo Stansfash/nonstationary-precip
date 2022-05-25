@@ -10,10 +10,10 @@ from gpytorch.mlls import VariationalELBO, AddedLossTerm
 from torch.utils.data import TensorDataset, DataLoader
 from gpytorch.mlls import DeepApproximateMLL
 
-data_df = pd.read_csv('khyber_2000_2010_tp.csv')
+data_df = pd.read_csv('uib_jan2000_tp.csv')
 
 data = torch.Tensor(data_df.values)
-X = data[:, 1:-1]
+X = data[:394, :-1]
 X = X - X.min(0)[0]
 X = 2 * (X / X.max(0)[0]) - 1
 y = data[:, -1]
@@ -28,21 +28,19 @@ test_y = y[train_n:].contiguous()
 if torch.cuda.is_available():
     train_x, train_y, test_x, test_y = train_x.cuda(), train_y.cuda(), test_x.cuda(), test_y.cuda()
 
-
 train_dataset = TensorDataset(train_x, train_y)
 train_loader = DataLoader(train_dataset, batch_size=1024, shuffle=True)
 
 
 #### Model 
-model = dgps.DeepGP2(train_x.shape)
+model = dgps.DeepGP3(train_x.shape)
 
 if torch.cuda.is_available():
     model = model.cuda()
 
-
 #### Training
-num_epochs = 20
-num_samples = 400
+num_epochs = 200
+num_samples = 10
 
 optimizer = torch.optim.Adam([
     {'params': model.parameters()},
