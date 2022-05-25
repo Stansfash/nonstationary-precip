@@ -91,4 +91,4 @@ df1 = pd.DataFrame()
 df1['pred'] = predictive_means.mean(axis=0)
 df1['lat'] = data[:394,1]
 df1['lon'] = data[:394,0]
-df1.to_csv('DGP3_10samples_uib_jan2000.csv')
+df1.to_csv('DGP5_10samples_uib_jan2000.csv')
