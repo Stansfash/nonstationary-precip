@@ -16,14 +16,14 @@ data = torch.Tensor(data_df.values)
 X = data[:394, :-1]
 X = X - X.min(0)[0]
 X = 2 * (X / X.max(0)[0]) - 1
-y = data[:, -1]
+y = data[:394, -1]
 
-train_n = int(floor(0.8 * len(X)))
-train_x = X[:train_n, :].contiguous()
-train_y = y[:train_n].contiguous()
+#train_n = int(floor(0.8 * len(X)))
+train_x = X #[:train_n, :].contiguous()
+train_y = y #[:train_n].contiguous()
 
-test_x = X[train_n:, :].contiguous()
-test_y = y[train_n:].contiguous()
+test_x = X #[train_n:, :].contiguous()
+test_y = y #[train_n:].contiguous()
 
 if torch.cuda.is_available():
     train_x, train_y, test_x, test_y = train_x.cuda(), train_y.cuda(), test_x.cuda(), test_y.cuda()
@@ -91,4 +91,4 @@ df1 = pd.DataFrame()
 df1['pred'] = predictive_means.mean(axis=0)
 df1['lat'] = data[:394,1]
 df1['lon'] = data[:394,0]
-df1.to_csv('DGP5_10samples_uib_jan2000.csv')
+df1.to_csv('DGP3_10samples_uib_jan2000.csv')
