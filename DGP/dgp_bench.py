@@ -34,14 +34,14 @@ train_loader = DataLoader(train_dataset, batch_size=1024, shuffle=True)
 
 
 #### Model 
-model = dgps.DeepGP5(train_x.shape)
+model = dgps.DeepGP3(train_x.shape)
 
 if torch.cuda.is_available():
     model = model.cuda()
 
 #### Training
 num_epochs = 200
-num_samples = 10
+num_samples = 100
 
 optimizer = torch.optim.Adam([
     {'params': model.parameters()},
@@ -92,4 +92,4 @@ df1 = pd.DataFrame()
 df1['pred'] = predictive_means.mean(axis=0)
 df1['lat'] = data[:394,1]
 df1['lon'] = data[:394,0]
-df1.to_csv('DGP5_10samples_uib_jan2000_2.csv')
+df1.to_csv('DGP3_100samples_uib_jan2000_2.csv')
