@@ -6,3 +6,5 @@ __pycache__/*
 notebooks/*
 tutorials/*
 plots/*
+data/*
+*.sh
