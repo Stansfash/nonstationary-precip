@@ -7,4 +7,5 @@ notebooks/*
 tutorials/*
 plots/*
 data/*
+archive/*
 *.sh
