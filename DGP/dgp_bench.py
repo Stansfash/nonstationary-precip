@@ -11,7 +11,7 @@ from torch.utils.data import TensorDataset, DataLoader
 from gpytorch.mlls import DeepApproximateMLL
 
 
-data_df = pd.read_csv('uib_jan2000_tp.csv')
+data_df = pd.read_csv('uib_2000_2001_tp.csv')
 
 data = torch.Tensor(data_df.values)
 X = data[:394, :-1]
@@ -19,12 +19,12 @@ X = X - X.min(0)[0]
 X = 2 * (X / X.max(0)[0]) - 1
 y = data[:394, -1]
 
-#train_n = int(floor(0.8 * len(X)))
-train_x = X #[:train_n, :].contiguous()
-train_y = y #[:train_n].contiguous()
+train_n = int(floor(0.8 * len(X)))
+train_x = X[:train_n, :].contiguous()
+train_y = y[:train_n].contiguous()
 
-test_x = X #[train_n:, :].contiguous()
-test_y = y #[train_n:].contiguous()
+test_x = X[train_n:, :].contiguous()
+test_y = y [train_n:].contiguous()
 
 if torch.cuda.is_available():
     train_x, train_y, test_x, test_y = train_x.cuda(), train_y.cuda(), test_x.cuda(), test_y.cuda()
@@ -34,7 +34,7 @@ train_loader = DataLoader(train_dataset, batch_size=1024, shuffle=True)
 
 
 #### Model 
-model = dgps.DeepGP3(train_x.shape)
+model = dgps.DeepGP2(train_x.shape)
 
 if torch.cuda.is_available():
     model = model.cuda()
@@ -92,4 +92,4 @@ df1 = pd.DataFrame()
 df1['pred'] = predictive_means.mean(axis=0)
 df1['lat'] = data[:394,1]
 df1['lon'] = data[:394,0]
-df1.to_csv('DGP3_100samples_uib_jan2000_2.csv')
+df1.to_csv('DGP2_100samples_uib_jan2000.csv')
