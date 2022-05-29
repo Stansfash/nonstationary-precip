@@ -9,3 +9,4 @@ plots/*
 data/*
 archive/*
 *.sh
+.spyproject/*
