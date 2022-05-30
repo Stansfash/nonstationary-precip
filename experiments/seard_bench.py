@@ -6,7 +6,7 @@ import os
 from math import floor
 import pandas as pd
 import numpy as np
-import models as m
+import models.dgps as m
 from gpytorch.mlls import VariationalELBO, AddedLossTerm
 from torch.utils.data import TensorDataset, DataLoader
 from gpytorch.mlls import DeepApproximateMLL
@@ -19,9 +19,18 @@ nlpds = []
 
 # Kernels
 # kernel = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(ard_num_dims=2))
-kernel = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(ard_num_dims=1, active_dims=[0]) * gpytorch.kernels.PeriodicKernel(active_dims=[0]))
-# kernel = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(ard_num_dims=3) + gpytorch.kernels.RBFKernel(ard_num_dims=1, active_dims=[0])*gpytorch.kernels.PeriodicKernel(active_dims=[0]))
+# kernel = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(ard_num_dims=1, active_dims=[0]) * gpytorch.kernels.PeriodicKernel(active_dims=[0]))
 
+# Kernels for timeseries modelling
+periodic_kernel = gpytorch.kernels.PeriodicKernel(active_dims=(0,)).initialize(lengthscale=0, period_length=1)
+
+soft_per_kernel = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel()
+                                               + gpytorch.kernels.PeriodicKernel(active_dims=[0]) 
+                                               * gpytorch.kernels.RBFKernel(active_dims=[0]))
+kernel = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(lengthscale_prior=gpytorch.priors.NormalPrior(0.07, 0.1)))
+kernel3 = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel()
+                                               + gpytorch.kernels.PeriodicKernel() #period_length_constraint = gpytorch.constraints.Interval(0.06, 0.07)) 
+                                               * gpytorch.kernels.RBFKernel(), outputscale_prior= gpytorch.priors.NormalPrior(3.0, 0.5))
 
 for random_state in range(10):
     print('random_state = ', random_state)
@@ -50,7 +59,10 @@ for random_state in range(10):
 
     # initialize likelihood and model
     likelihood = gpytorch.likelihoods.GaussianLikelihood()
-    model = m.ExactGPModel(train_x, train_y, likelihood, kernel)
+    model = m.ExactGPModel(train_x, train_y, likelihood, kernel3)
+    
+    # Initialize lengthscale and outputscale to mean of priors
+    #model.covar_module.outputscale = outputscale_prior.mean
 
     #### Training
     training_iter = 50
@@ -59,8 +71,13 @@ for random_state in range(10):
     model.train()
     likelihood.train()
 
+    # Parameters to optimise
+    #training_parameters = [p for name, p in model.named_parameters()if not name.startswith('covar_module.base_kernel.kernels.1.kernels.0.raw_period')]
+    training_parameters =  model.parameters() # all parameters
+
+
     # Use the adam optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.1)  # Includes GaussianLikelihood parameters
+    optimizer = torch.optim.Adam(training_parameters , lr=0.1)  # Includes GaussianLikelihood parameters
     # "Loss" for GPs - the marginal log likelihood
     mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)   
 
@@ -111,7 +128,7 @@ for random_state in range(10):
     #df1['lat'] = data[:,1]
     #df1['lon'] = data[:,0]
     df1['time'] = data[:,0]
-    df1.to_csv('data/SEARD_uib_32lat_81lon.csv')
+    df1.to_csv('data/softk_uib_32lat_81lon_.csv')
     #df1.to_csv('data/SEARD_u_uib_jan2000.csv')
 
 print(np.mean(rmses), '±', np.std(rmses)/np.sqrt(10))
