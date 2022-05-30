@@ -8,21 +8,21 @@ import numpy as np
 import math
 import torch 
 import gpytorch
-import os
-import gpytorch
 import pandas as pd
-import matplotlib
-import cartopy.crs as ccrs
 import matplotlib.pylab as plt
+from utils.metrics import get_trainable_param_names
 from gpytorch.kernels import ScaleKernel, RBFKernel, PeriodicKernel
+from gpytorch.constraints import GreaterThan
 from models.multivariate_gibbs_kernel import MultivariateGibbsKernel
-gpytorch.settings.cholesky_jitter(1e-5)
 
-from utils.config import BASE_SEED
-from utils.config import DATASET_DIR
+from utils.config import BASE_SEED, EPSILON, DATASET_DIR
+from utils.metrics import rmse, nlpd
 
 rng = np.random.default_rng(BASE_SEED)
 torch.manual_seed(BASE_SEED)
+gpytorch.settings.cholesky_jitter(EPSILON)
+
+## helper methods and classes ()
 
 def load_khyber_timeseries():
     
@@ -30,12 +30,14 @@ def load_khyber_timeseries():
     data = pd.read_csv(fname)
     return torch.Tensor(np.array(data))[:,0], torch.Tensor(np.array(data)[:,-1])
 
-class KhyberTemporal(gpytorch.models.ExactGP):
+class KhyberTemporalStat(gpytorch.models.ExactGP):
     
     def __init__(self, train_x, train_y, likelihood):
         super().__init__(train_x, train_y, likelihood)
-        self.mean_module = gpytorch.means.ZeroMean()
-        self.covar_module = ScaleKernel(RBFKernel()*PeriodicKernel())
+        self.mean_module = gpytorch.means.ConstantMean()
+        self.covar_module = ScaleKernel(RBFKernel()*PeriodicKernel(), outputscale_constraint=GreaterThan(7
+            ))
+        
         
     def forward(self, x):
         mean = self.mean_module(x)
@@ -55,7 +57,7 @@ if __name__ == "__main__":
         
     num_train = math.ceil(80/100 * y.shape[0])
     idx = np.arange(0, y.shape[0], 1)
-    rng.shuffle(idx)
+    #rng.shuffle(idx)
     train_idx = idx[:num_train]
     test_idx = idx[num_train:]
     x_train = x_norm[..., train_idx].detach()
@@ -63,15 +65,18 @@ if __name__ == "__main__":
     x_test = x_norm[..., test_idx].detach()
     y_test = y_norm[..., test_idx].detach()
     
-     ## Training 
+    ## Training 
     
     likelihood = gpytorch.likelihoods.GaussianLikelihood()
-    model = KhyberTemporal(x_train, y_train, likelihood)
+    model = KhyberTemporalStat(x_train, y_train, likelihood)
+    
+    ## inits
+    likelihood.noise_covar.noise = 1e-1
 
     model.train()
     likelihood.train()
     
-    n_iter = 5000
+    n_iter = 2000
     
     model.train()
     likelihood.train()
@@ -86,7 +91,7 @@ if __name__ == "__main__":
         loss = -mll(output, y_train)
         loss.backward()
         losses.append(loss.item())
-        if i%5 == 0:
+        if i%500 == 0:
             print('Iter %d/%d - Loss: %.3f  noise: %.3f' % (
                 i + 1, n_iter, loss.item(),
                 model.likelihood.noise.item()
@@ -98,20 +103,38 @@ if __name__ == "__main__":
     model.eval()
     likelihood.eval()
     
+    pred_y_test = likelihood(model(x_test)) 
+    y_mean = pred_y_test.loc.detach()
+    y_var = pred_y_test.covariance_matrix.diag().sqrt().detach()
+    
+    ## Metrics
+    rmse_test = rmse(y_mean, y_test, stdy)
+    nlpd_test = nlpd(pred_y_test, y_test, stdy)
+    
+    print('RMSE test =  ' + str(rmse_test))
+    print('NLPD test = ' + str(nlpd_test))
+    
     ## Pred full
     
-    pred_f = model(x)
+    pred_f = likelihood(model(x_norm))
     
     f_mean = pred_f.loc.detach()
     f_var = pred_f.covariance_matrix.diag().detach()
     
     ## viz
+    
     f_true = f_mean*stdy + meany
     f_sigma = torch.sqrt(f_var)*stdy
-        
-    plt.plot(x,y,label='Observations')
-    plt.plot(x,f_true,label='Posterior mean')
-    plt.fill_between(x, y - 2*f_sigma, y + 2*f_sigma, color='orange', alpha=0.5)
-    plt.legend(fontsize='small')
-    plt.title('Temporal Model')
+    
+    plt.figure(figsize=(9,3))
+    plt.scatter(x,y, marker='+',c='green', label='Observations')
+    plt.plot(x,f_true, color='orange')
+    plt.fill_between(x, f_true - 2*f_sigma, f_true + 2*f_sigma, color='orange', alpha=0.5)
+    plt.plot(x[test_idx], y_mean*stdy + meany, color='r', label='Posterior test mean')
+    plt.axvline(x[test_idx][0], color='k', linestyle='--')
+    plt.legend(fontsize='x-small')
+    plt.title('Temporal Kernel (extrapolation)', fontsize='small')
+    
+  
+    
     

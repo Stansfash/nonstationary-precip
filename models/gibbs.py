@@ -30,7 +30,7 @@ import math
 import torch
 import gpytorch
 from typing import Tuple, Optional
-from ..utils import functional as fn
+from utils import functional as fn
 
 class PositivePriorProcess(torch.nn.Module):
     """Base class for lengthscale prior processes."""

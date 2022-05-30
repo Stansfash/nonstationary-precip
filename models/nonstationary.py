@@ -16,8 +16,8 @@ DiagonalSparseGP(train_x, train_y, likelihood, prior, z, num_dim : int=1)
 import math
 import torch
 import gpytorch
-from ..kernels.gibbs import GibbsKernel, GibbsSafeScaleKernel, InducingGibbsKernel
-from ..utils import functional as fn
+from models.gibbs import GibbsKernel, GibbsSafeScaleKernel, InducingGibbsKernel
+from utils import functional as fn
 
 class DiagonalExactGP(gpytorch.models.ExactGP):
     """Model for MAP inference of diagonal Gibbs kernel GP. 
@@ -58,7 +58,7 @@ class DiagonalExactGP(gpytorch.models.ExactGP):
                                             * torch.eye(K_xx.shape[-1]).to(K_xx.device)) @ fn.t(K_sx)
 
         f_pred = gpytorch.distributions.MultivariateNormal(mu, 
-                                                covariance_matrix=sigma+1e-4*torch.eye(K_ss.shape[-1]).to(K_ss.device))
+                                                covariance_matrix=sigma+1e-2*torch.eye(K_ss.shape[-1]).to(K_ss.device))
         return f_pred
 
 class DiagonalSparseGP(gpytorch.models.ExactGP):
