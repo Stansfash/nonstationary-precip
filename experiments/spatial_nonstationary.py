@@ -16,7 +16,7 @@ import matplotlib
 import cartopy.crs as ccrs
 import matplotlib.pylab as plt
 from gpytorch.kernels import ScaleKernel, RBFKernel
-from kernels.multivariate_gibbs_kernel import MultivariateGibbsKernel
+from models.multivariate_gibbs_kernel import MultivariateGibbsKernel
 gpytorch.settings.cholesky_jitter(1e-4)
 
 torch.manual_seed(13)

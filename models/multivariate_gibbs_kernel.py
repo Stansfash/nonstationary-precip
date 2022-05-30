@@ -8,7 +8,7 @@ Multivariate Gibbs Kernel -> Matrix GP prior with Paciorek and Scheverish form.
 import gpytorch 
 import torch
 import pymc3 as pm
-from kernels.latent_priors import MatrixVariateNormalPrior
+from models.latent_priors import MatrixVariateNormalPrior
 from gpytorch.kernels import RBFKernel, ScaleKernel
 from utils.metrics import get_trainable_param_names
 import numpy as np
