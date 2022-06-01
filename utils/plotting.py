@@ -3,6 +3,7 @@
 import xarray as xr
 import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
 import cartopy.crs as ccrs
 
 def simple_plot(filepath='khyber_2000_2010_tp.csv'):

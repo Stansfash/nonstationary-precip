@@ -1,6 +1,8 @@
 *.o
 *.e
+*.pyc
 */__pycache__/*
+__pycache__/*
 */.ipynb_checkpoints
 .ipynb_checkpoints/*
 notebooks/*
@@ -9,3 +11,4 @@ plots/*
 archive/*
 *.sh
 .spyproject/*
+anaconda3_restore/*
