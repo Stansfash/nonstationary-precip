@@ -4,18 +4,17 @@ import torch
 import gpytorch
 
 from gpytorch.means import ConstantMean, LinearMean
-from gpytorch.kernels import RBFKernel, ScaleKernel
+from gpytorch.kernels import RBFKernel, ScaleKernel,  PeriodicKernel
 from gpytorch.variational import VariationalStrategy, CholeskyVariationalDistribution
 from gpytorch.distributions import MultivariateNormal
 from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.models.deep_gps import DeepGPLayer, DeepGP
 
-
 num_output_dims = 10
 
 class ToyDeepGPHiddenLayer(DeepGPLayer):
     
-    def __init__(self, input_dims, output_dims, num_inducing=128, mean_type='constant'):
+    def __init__(self, input_dims, output_dims, num_inducing=394*5, mean_type='constant'):
         if output_dims is None:
             inducing_points = torch.randn(num_inducing, input_dims)
             batch_shape = torch.Size([])
@@ -188,9 +187,7 @@ class ExactGPModel(gpytorch.models.ExactGP):
     def __init__(self, train_x, train_y, likelihood, kernel):
         super(ExactGPModel, self).__init__(train_x, train_y, likelihood)
         self.mean_module = gpytorch.means.ConstantMean()
-
-        self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel() + gpytorch.kernels.PeriodicKernel() * gpytorch.kernels.RBFKernel())
-
+        self.covar_module = kernel
 
     def forward(self, x):
         mean_x = self.mean_module(x)

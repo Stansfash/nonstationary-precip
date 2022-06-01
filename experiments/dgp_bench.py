@@ -11,12 +11,14 @@ from gpytorch.mlls import VariationalELBO, AddedLossTerm
 from torch.utils.data import TensorDataset, DataLoader
 from gpytorch.mlls import DeepApproximateMLL
 from sklearn.utils import shuffle
+import scipy.stats
+from scipy.special import inv_boxcox
 
 num_epochs = 200
 num_samples = 10
-num_layers = 3
-#filepath = 'data/uib_jan2000_tp.csv'
-filepath = 'data/uib_lat32_lon81_tp.csv'
+num_layers = 5
+filepath = 'data/uib_jan2000_tp.csv'
+#filepath = 'data/uib_lat32_lon81_tp.csv'
 
 print('num_epochs = ', num_epochs)
 print('num_samples = ', num_samples)
@@ -24,6 +26,7 @@ print('num_layers = ', num_layers)
 
 rmses = []
 nlpds = []
+
 
 for random_state in range(10):
     print('random_state = ', random_state)
@@ -36,13 +39,15 @@ for random_state in range(10):
     X = X - X.min(0)[0]
     X = 2 * (X / X.max(0)[0]) - 1
     y = data[:, -1]
+    y_tr, bc_param = scipy.stats.boxcox(y + 0.001)
+    y_tr = torch.Tensor(y_tr)
 
-    train_n = int(floor(0.75 * len(X)))
+    train_n = int(floor(0.80 * len(X)))
     train_x = X[:train_n, :].contiguous()
-    train_y = y[:train_n].contiguous()
+    train_y = y_tr[:train_n].contiguous()
 
     test_x = X[train_n:, :].contiguous()
-    test_y = y [train_n:].contiguous()
+    test_y = y[train_n:].contiguous()
 
     if torch.cuda.is_available():
         train_x, train_y, test_x, test_y = train_x.cuda(), train_y.cuda(), test_x.cuda(), test_y.cuda()
@@ -89,9 +94,19 @@ for random_state in range(10):
         lpd = torch.distributions.Normal(predicted_mean, torch.sqrt(predicted_var)).log_prob(test_y)
         # return the average
         return -torch.mean(lpd)
+
     def sqrt_mean_squared_error(test_y, predicted_mean):
         return torch.sqrt(torch.mean((test_y - predicted_mean)**2))
 
+
+    def rmse(Y_pred_mean, Y_test, Y_std):
+      return Y_std.item()*torch.sqrt(torch.mean((Y_pred_mean - Y_test)**2)).detach()
+  
+    def nlpd(Y_test_pred, Y_test, Y_std):
+      lpd = Y_test_pred.log_prob(Y_test)
+      # return the average
+      avg_lpd_rescaled = lpd.detach()/len(Y_test) - torch.log(Y_std)
+      return -avg_lpd_rescale
 
     test_dataset = TensorDataset(test_x, test_y)
     test_loader = DataLoader(test_dataset, batch_size=1024)
@@ -99,8 +114,12 @@ for random_state in range(10):
     model.eval()
     predictive_means, predictive_variances, test_lls = model.predict(test_loader)
 
-    rmse = sqrt_mean_squared_error(test_y, predictive_means)
-    nlpd = negative_log_predictive_density(test_y, predictive_means, predictive_variances)
+    # Inverse transform predictions
+    predictive_means_tr = torch.Tensor(inv_boxcox(predictive_means, bc_param))
+    vanilla_variances = torch.Tensor(np.ones((len(predictive_variances), len(predictive_variances[0]))))
+
+    rmse = sqrt_mean_squared_error(test_y, predictive_means_tr)
+    nlpd = negative_log_predictive_density(test_y, predictive_means_tr, vanilla_variances)
 
     print(f"RMSE: {rmse.item()}, NLPD: {nlpd.item()}")
     rmses.append(rmse.item())
@@ -110,6 +129,7 @@ for random_state in range(10):
     plt_loader = DataLoader(plt_dataset, batch_size=1024)
     all_predictive_means, _, _ = model.predict(plt_loader)
 
+    '''
     df1 = pd.DataFrame()
     df1['pred'] = all_predictive_means.mean(axis=0)
     #df1['lat'] = data[:,1]
@@ -117,6 +137,7 @@ for random_state in range(10):
     df1['time'] = data[:,0]
     df1.to_csv('data/DGP'+ str('num_layers')+'_'+ str(num_samples)+'samples_uib_32lat_81lon.csv')
     #df1.to_csv('data/DGP'+ str('num_layers')+'_'+ str(num_samples)+'samples_uib_jan2000.csv')
+    '''
 
 print(np.mean(rmses), '±', np.std(rmses)/np.sqrt(10))
 print(np.mean(nlpds), '±', np.std(nlpds)/np.sqrt(10))
