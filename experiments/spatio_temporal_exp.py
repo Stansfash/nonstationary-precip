@@ -107,7 +107,7 @@ if __name__ == "__main__":
     
     if args['model'] == 'Non-stationary':
         
-        prior = LogNormalPriorProcess(input_dim=2).to(device)
+        prior = LogNormalPriorProcess(input_dim=2, active_dims=(0,1)).to(device)
             #### change the prior settings here if desired
         prior.covar_module.outputscale = float(args['prior_scale']) * torch.ones_like(prior.covar_module.outputscale)
         prior.covar_module.base_kernel.lengthscale = float(args['prior_ell']) * torch.ones_like(
@@ -140,7 +140,7 @@ if __name__ == "__main__":
     model.train()
     likelihood.train()
     
-    n_iter = 2000
+    n_iter = 20
      
     optimizer = torch.optim.Adam(model.parameters(), lr=0.015)  
     mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)

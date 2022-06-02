@@ -38,7 +38,7 @@ class SparseSpatioTemporal_Nonstationary(gpytorch.models.ExactGP):
     def __init__(self, train_x, train_y, likelihood, prior, z, num_dim=1):
         super().__init__(train_x, train_y, likelihood)
         self.mean_module = gpytorch.means.ZeroMean()
-        self.spatial_covar_module = GibbsSafeScaleKernel(InducingGibbsKernel(GibbsKernel(lengthscale_prior=prior, ard_num_dims=2, active_dims=(1,2)), inducing_points = z, likelihood=likelihood, active_dims=(1,2)), active_dims=(1,2))
+        self.spatial_covar_module = GibbsSafeScaleKernel(InducingGibbsKernel(GibbsKernel(lengthscale_prior=prior, active_dims=(0,1)), inducing_points = z, likelihood=likelihood, active_dims=(1,2)), active_dims=(1,2))
         self.temporal_covar_module = InducingPointKernel(ScaleKernel(RBFKernel(active_dims=(0))*PeriodicKernel(active_dims=(0)),
                                                  outputscale_constraint=GreaterThan(7), active_dims=0), inducing_points=self.spatial_covar_module.base_kernel.inducing_points, likelihood=likelihood, active_dims=(0))
         self.temporal_covar_module.inducing_points.requires_grad = False
@@ -66,6 +66,7 @@ class SparseSpatioTemporal_Nonstationary(gpytorch.models.ExactGP):
         inputs = [x_new.unsqueeze(-1) if x_new.ndimension() == 1 else x_new]
         
         # Concatenate the input to the training input
+        active_dims = self.covar_module.kernels[0].active_dims
         full_inputs = []
         ell_cond = []
         batch_shape = train_inputs[0].shape[:-2]
@@ -79,14 +80,13 @@ class SparseSpatioTemporal_Nonstationary(gpytorch.models.ExactGP):
                 train_input = train_input.expand(*batch_shape, *train_input.shape[-2:])
                 input = input.expand(*batch_shape, *input.shape[-2:])
             full_inputs.append(torch.cat([train_input, input], dim=-2))
-            ell_cond.append(self.covar_module.base_kernel.base_kernel.lengthscale_prior.conditional_sample(
-                full_inputs[0], given=(self.covar_module.base_kernel.inducing_points, 
+            ell_cond.append(self.covar_module.kernels[0].base_kernel.base_kernel.lengthscale_prior.conditional_sample(
+                full_inputs[0][:,active_dims], given=(self.covar_module.kernels[0].base_kernel.inducing_points[:,active_dims], 
                                                   torch.exp(self.log_ell_z)))
                            )
         full_output = self.forward(*full_inputs)
         full_mean, full_covar = full_output.loc, full_output.lazy_covariance_matrix.evaluate_kernel()
         
-
         # Determine the shape of the joint distribution
         batch_shape = full_output.batch_shape
         joint_shape = full_output.event_shape
@@ -102,12 +102,14 @@ class SparseSpatioTemporal_Nonstationary(gpytorch.models.ExactGP):
         if isinstance(full_covar, gpytorch.lazy.LowRankRootLazyTensor):
             L = full_covar.root[..., train_inputs[0].shape[-2]:, :].evaluate()
         else:
-            L = full_covar._lazy_tensor.root[..., train_inputs[0].shape[-2]:, :].evaluate()
+            #L = full_covar._lazy_tensor.root[..., train_inputs[0].shape[-2]:, :].evaluate()
+            L = full_covar.evaluate()[..., train_inputs[0].shape[-2]:, :]
+
         # A = K_{zz}^{-1/2} K_{zx} / \sigma 
         if isinstance(full_covar, gpytorch.lazy.LowRankRootLazyTensor):
             At = full_covar.root[..., :train_inputs[0].shape[-2], :].evaluate()/math.sqrt(self.likelihood.noise)
         else:
-            At = full_covar._lazy_tensor.root[..., :train_inputs[0].shape[-2], :].evaluate()/math.sqrt(
+            At = full_covar.evaluate()[..., :train_inputs[0].shape[-2], :]/math.sqrt(
                 self.likelihood.noise)
         # B = I + AA^T
         B = torch.eye(At.shape[-1]).to(At.device) + fn.t(At) @ At

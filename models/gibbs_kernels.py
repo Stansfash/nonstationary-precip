@@ -60,12 +60,12 @@ class PositivePriorProcess(torch.nn.Module):
         
 class LogNormalPriorProcess(PositivePriorProcess):
     """D independent GPs for the log-value."""
-    def __init__(self, input_dim : int=1, covariance_function : gpytorch.kernels.Kernel=None) -> None:
+    def __init__(self, input_dim : int=1, covariance_function : gpytorch.kernels.Kernel=None, active_dims=None) -> None:
         super().__init__()
         self.mean_module = gpytorch.means.ConstantMean(batch_shape=torch.Size((input_dim,)))
         if covariance_function is None:
             covariance_function = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(
-                ard_num_dims=input_dim, batch_shape=torch.Size((input_dim,)) ), batch_shape=torch.Size((input_dim,))
+                ard_num_dims=input_dim, batch_shape=torch.Size((input_dim,)), active_dims=active_dims), batch_shape=torch.Size((input_dim,)), active_dims=active_dims
             )
         self.covar_module = covariance_function
         
@@ -285,7 +285,7 @@ class InducingGibbsKernel(gpytorch.kernels.InducingPointKernel):
         if not self.training and hasattr(self, "_cached_kernel_mat"):
             return self._cached_kernel_mat
         else:
-            res = gpytorch.lazy.delazify(self.base_kernel(self.inducing_points, self.inducing_points,
+            res = gpytorch.lazy.delazify(self.base_kernel(self.inducing_points[:,self.active_dims], self.inducing_points[:,self.active_dims],
                                                          ell1=ell))
             if not self.training:
                 self._cached_kernel_mat = res
@@ -307,16 +307,16 @@ class InducingGibbsKernel(gpytorch.kernels.InducingPointKernel):
     def _get_covariance(self, x1, x2, ell):
         # first sample lengthscales
         if torch.equal(x1, x2):
-            ell1 = self.base_kernel.lengthscale_prior.conditional_sample(x1, given=(self.inducing_points,
+            ell1 = self.base_kernel.lengthscale_prior.conditional_sample(x1, given=(self.inducing_points[:,self.active_dims],
                                                                                     ell))
             ell2 = ell1
         else:
             ell_cond = self.base_kernel.lengthscale_prior.conditional_sample(torch.cat((x1, x2), dim=-2), 
-                                                    given=(self.inducing_points, ell))
+                                                    given=(self.inducing_points[:,self.active_dims], ell))
             ell1 = ell_cond[...,:x1.shape[-2], :]
             ell2 = ell_cond[...,x1.shape[-2]:, :]
 
-        k_ux1 = gpytorch.lazy.delazify(self.base_kernel(x1, self.inducing_points, ell1=ell1,
+        k_ux1 = gpytorch.lazy.delazify(self.base_kernel(x1, self.inducing_points[:,self.active_dims], ell1=ell1,
                                                        ell2=ell))
         if torch.equal(x1, x2):
             covar = gpytorch.lazy.LowRankRootLazyTensor(k_ux1.matmul(self._inducing_inv_root(ell)))
@@ -328,7 +328,7 @@ class InducingGibbsKernel(gpytorch.kernels.InducingPointKernel):
                 covar = gpytorch.lazy.LowRankRootAddedDiagLazyTensor(covar, 
                                                         gpytorch.lazy.DiagLazyTensor(correction))
         else:
-            k_ux2 = gpytorch.lazy.delazify(self.base_kernel(x2, self.inducing_points, ell1=ell2, ell2=ell))
+            k_ux2 = gpytorch.lazy.delazify(self.base_kernel(x2, self.inducing_points[:,self.active_dims], ell1=ell2, ell2=ell))
             covar = gpytorch.lazy.MatmulLazyTensor(
                 k_ux1.matmul(self._inducing_inv_root(ell)), k_ux2.matmul(self._inducing_inv_root(ell)).transpose(-1, -2)
             )
