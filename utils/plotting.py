@@ -5,6 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import cartopy.crs as ccrs
+from mpl_toolkits.basemap import Basemap
 
 def simple_plot(filepath='khyber_2000_2010_tp.csv'):
     """ Simple plot without cartopy """
@@ -58,5 +59,17 @@ def facetgrid_plot(filepath='khyber_2000_2010_tp.csv'):
     g.set_ylabels('Latitude °N')
     g.set_titles('{coord} : {value}')
     plt.show()
+    
+def plot_uib_etopo_image():
+    
+    m = Basemap(projection='lcc', resolution='l', lat_0=34.5, lon_0=77.0, width=1.3e+6, height=(1e+6)*0.8)
+    
+    m.bluemarble()
+    m.drawrivers(color='dodgerblue',linewidth=1.0,zorder=1)
+    parallels = np.arange(30,40,1)
+    m.drawparallels(parallels,labels=[1,0,0,0],fontsize=11)
+    # draw meridians
+    meridians = np.arange(72,82.5,2.5)
+    m.drawmeridians(meridians,labels=[0,0,0,1],fontsize=11)
 
 
