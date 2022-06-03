@@ -17,7 +17,7 @@ from utils.metrics import nlpd, rmse
 
 num_epochs = 200
 num_samples = 10
-num_layers = 2
+num_layers = 3
 filepath = 'data/uib_jan2000_tp.csv'
 #filepath = 'data/uib_lat32_lon81_tp.csv'
 
@@ -40,18 +40,18 @@ for random_state in range(10):
     X = X - X.min(0)[0]
     X = 2 * (X / X.max(0)[0]) - 1
     y = data[:, -1]
-    y_tr, bc_param = scipy.stats.boxcox(y + 0.001)
+    y_tr, bc_param = scipy.stats.boxcox(y)
     y_tr = torch.Tensor(y_tr)
 
     stdy_tr, _ = torch.std_mean(y_tr)
-    stdy, _ = torch.std_mean(y_tr)
+    stdy, _ = torch.std_mean(y)
 
     train_n = int(floor(0.80 * len(X)))
     train_x = X[:train_n, :].contiguous()
     train_y = y_tr[:train_n].contiguous()
 
     test_x = X[train_n:, :].contiguous()
-    test_y = y[train_n:].contiguous()
+    test_y = y_tr[train_n:].contiguous()
 
     if torch.cuda.is_available():
         train_x, train_y, test_x, test_y = train_x.cuda(), train_y.cuda(), test_x.cuda(), test_y.cuda()
@@ -113,22 +113,23 @@ for random_state in range(10):
     nlpd_test = nlpd(pred_y, test_y, stdy_tr).mean()
 
     print(f"RMSE: {rmse_test.item()}, NLPD: {nlpd_test.item()}")
-    rmses.append(rmse.item())
-    nlpds.append(nlpd.item())
+    rmses.append(rmse_test.item())
+    nlpds.append(nlpd_test.item())
 
     '''
     plt_dataset = TensorDataset(X, y)
     plt_loader = DataLoader(plt_dataset, batch_size=1024)
-    all_predictive_means, _, _ = model.predict(plt_loader)
+    plt_pred_y, plt_y_means, plt_y_var, plt_test_lls = model.predict(plt_loader)
 
     
     df1 = pd.DataFrame()
-    df1['pred'] = all_predictive_means.mean(axis=0)
-    #df1['lat'] = data[:,1]
-    #df1['lon'] = data[:,0]
-    df1['time'] = data[:,0]
-    df1.to_csv('data/DGP'+ str('num_layers')+'_'+ str(num_samples)+'samples_uib_32lat_81lon.csv')
-    #df1.to_csv('data/DGP'+ str('num_layers')+'_'+ str(num_samples)+'samples_uib_jan2000.csv')
+    df1['pred'] = plt_y_means.mean(axis=0)
+    df1['var'] =  np.sqrt(plt_y_var.mean(axis=0))
+    df1['lat'] = data[:,1]
+    df1['lon'] = data[:,0]
+    #df1['time'] = data[:,0]
+    #df1.to_csv('data/DGP'+ str('num_layers')+'_'+ str(num_samples)+'samples_uib_32lat_81lon.csv')
+    df1.to_csv('data/DGP'+ str('num_layers')'_transform_uib_jan2000.csv')
     '''
 
 print(np.mean(rmses), '±', np.std(rmses)/np.sqrt(10))

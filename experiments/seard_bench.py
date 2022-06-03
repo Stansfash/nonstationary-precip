@@ -30,7 +30,7 @@ kernel1 = ScaleKernel(RBFKernel()*PeriodicKernel())
 kernel2 = ScaleKernel(MaternKernel(0.5)*PeriodicKernel())
 '''
 
-for random_state in range(10):
+for random_state in range(1):
     print('random_state = ', random_state)
 
     df = pd.read_csv(filepath)
@@ -121,20 +121,20 @@ for random_state in range(10):
     rmses.append(rmse_test.item())
     nlpds.append(nlpd_test.item())
 
-    '''
 
     with torch.no_grad():
-        trained_pred_dist = likelihood(model(X))
-        all_predictive_means = trained_pred_dist.mean
+        pred_y_test = likelihood(model(X))
+        y_mean = pred_y_test.loc.detach()
+        y_var = pred_y_test.covariance_matrix.diag().sqrt().detach()
 
     df1 = pd.DataFrame()
-    df1['pred'] = all_predictive_means
+    df1['pred'] = y_mean
+    df1['std'] =  np.sqrt(y_var)
     df1['y'] = data[:,-1]
-    #df1['lat'] = data[:,1]
-    #df1['lon'] = data[:,0]
-    df1['time'] = data[:,0]
-    df1.to_csv('data/softk_uib_32lat_81lon_.csv')
+    df1['lat'] = data[:,1]
+    df1['lon'] = data[:,0]
+    #df1['time'] = data[:,0]
+    #df1.to_csv('data/softk_uib_32lat_81lon_.csv')
     df1.to_csv('data/SEARD_transform_uib_jan2000.csv')
-'''
 print(np.mean(rmses), '±', np.std(rmses)/np.sqrt(10))
 print(np.mean(nlpds), '±', np.std(nlpds)/np.sqrt(10))
