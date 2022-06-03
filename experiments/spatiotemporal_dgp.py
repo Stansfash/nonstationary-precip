@@ -13,6 +13,7 @@ from gpytorch.mlls import DeepApproximateMLL
 from sklearn.utils import shuffle
 import scipy.stats
 from scipy.special import inv_boxcox
+from utils.metrics2 import nlpd, rmse
 
 num_epochs = 200
 num_samples = 10
