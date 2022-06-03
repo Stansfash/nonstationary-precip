@@ -100,7 +100,7 @@ class DeepGP2(DeepGP):
                 variances.append(preds.variance)
                 lls.append(self.likelihood.log_marginal(y_batch, self(x_batch)))
 
-        return torch.cat(mus, dim=-1), torch.cat(variances, dim=-1), torch.cat(lls, dim=-1)
+        return  preds, torch.cat(mus, dim=-1), torch.cat(variances, dim=-1), torch.cat(lls, dim=-1)
 
 
 class DeepGP3(DeepGP):

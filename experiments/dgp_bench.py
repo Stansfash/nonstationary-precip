@@ -13,10 +13,11 @@ from gpytorch.mlls import DeepApproximateMLL
 from sklearn.utils import shuffle
 import scipy.stats
 from scipy.special import inv_boxcox
+from utils.metrics import nlpd, rmse
 
 num_epochs = 200
 num_samples = 10
-num_layers = 5
+num_layers = 2
 filepath = 'data/uib_jan2000_tp.csv'
 #filepath = 'data/uib_lat32_lon81_tp.csv'
 
@@ -42,6 +43,9 @@ for random_state in range(10):
     y_tr, bc_param = scipy.stats.boxcox(y + 0.001)
     y_tr = torch.Tensor(y_tr)
 
+    stdy_tr, _ = torch.std_mean(y_tr)
+    stdy, _ = torch.std_mean(y_tr)
+
     train_n = int(floor(0.80 * len(X)))
     train_x = X[:train_n, :].contiguous()
     train_y = y_tr[:train_n].contiguous()
@@ -66,9 +70,10 @@ for random_state in range(10):
 
     if torch.cuda.is_available():
         model = model.cuda()
-    
+
 
     #### Training
+    model.train()
     optimizer = torch.optim.Adam([
         {'params': model.parameters()},
     ], lr=0.01)
@@ -89,47 +94,34 @@ for random_state in range(10):
 
 
     #### Metrics
-    def negative_log_predictive_density(test_y, predicted_mean, predicted_var):
-        # Vector of log-predictive density per test point    
-        lpd = torch.distributions.Normal(predicted_mean, torch.sqrt(predicted_var)).log_prob(test_y)
-        # return the average
-        return -torch.mean(lpd)
-
-    def sqrt_mean_squared_error(test_y, predicted_mean):
-        return torch.sqrt(torch.mean((test_y - predicted_mean)**2))
-
-
-    def rmse(Y_pred_mean, Y_test, Y_std):
-      return Y_std.item()*torch.sqrt(torch.mean((Y_pred_mean - Y_test)**2)).detach()
-  
-    def nlpd(Y_test_pred, Y_test, Y_std):
-      lpd = Y_test_pred.log_prob(Y_test)
-      # return the average
-      avg_lpd_rescaled = lpd.detach()/len(Y_test) - torch.log(Y_std)
-      return -avg_lpd_rescale
 
     test_dataset = TensorDataset(test_x, test_y)
     test_loader = DataLoader(test_dataset, batch_size=1024)
 
     model.eval()
-    predictive_means, predictive_variances, test_lls = model.predict(test_loader)
+    with torch.no_grad():
+        pred_y, y_means, y_var, test_lls = model.predict(test_loader)
 
     # Inverse transform predictions
-    predictive_means_tr = torch.Tensor(inv_boxcox(predictive_means, bc_param))
-    vanilla_variances = torch.Tensor(np.ones((len(predictive_variances), len(predictive_variances[0]))))
+    # pred_y_test_tr = torch.Tensor(inv_boxcox(pred_y_test, bc_param))
+    y_mean_tr = torch.Tensor(inv_boxcox(y_means, bc_param))
+    # y_var_tr = torch.Tensor(inv_boxcox(y_var + y_mean, bc_param,)) - y_mean_tr
+    test_y_tr = torch.Tensor(inv_boxcox(test_y, bc_param))
 
-    rmse = sqrt_mean_squared_error(test_y, predictive_means_tr)
-    nlpd = negative_log_predictive_density(test_y, predictive_means_tr, vanilla_variances)
+    ## Metrics
+    rmse_test = rmse(y_mean_tr, test_y_tr, stdy)
+    nlpd_test = nlpd(pred_y, test_y, stdy_tr).mean()
 
-    print(f"RMSE: {rmse.item()}, NLPD: {nlpd.item()}")
+    print(f"RMSE: {rmse_test.item()}, NLPD: {nlpd_test.item()}")
     rmses.append(rmse.item())
     nlpds.append(nlpd.item())
 
+    '''
     plt_dataset = TensorDataset(X, y)
     plt_loader = DataLoader(plt_dataset, batch_size=1024)
     all_predictive_means, _, _ = model.predict(plt_loader)
 
-    '''
+    
     df1 = pd.DataFrame()
     df1['pred'] = all_predictive_means.mean(axis=0)
     #df1['lat'] = data[:,1]
