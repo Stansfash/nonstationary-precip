@@ -44,5 +44,12 @@ def nlpd(Y_test_pred, Y_test, Y_std):
       avg_lpd_rescaled = lpd.detach()/len(Y_test) - torch.log(Y_std)
       return -avg_lpd_rescaled
   
+    
+def negative_log_predictive_density(test_y, predicted_mean, predicted_var):
+   # Vector of log-predictive density per test point    
+   lpd = torch.distributions.Normal(predicted_mean, torch.sqrt(predicted_var)).log_prob(test_y)
+   # return the average
+   return -torch.mean(lpd)
+ 
 
     

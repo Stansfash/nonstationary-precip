@@ -21,25 +21,26 @@ from models.spatio_temporal_models import SpatioTemporal_Stationary, SparseSpati
 from gpytorch.constraints import GreaterThan
 
 from utils.config import BASE_SEED, EPSILON, DATASET_DIR
-from utils.metrics import rmse, nlpd, get_trainable_param_names
+from utils.metrics import rmse, nlpd, negative_log_predictive_density,get_trainable_param_names
 
-rng = np.random.default_rng(BASE_SEED+2)
-torch.manual_seed(BASE_SEED+5)
 gpytorch.settings.cholesky_jitter(EPSILON)
 
 ## helper methods and classes 
 
-def load_khyber_data():
+def load_uib_data():
         
-    fname = str(DATASET_DIR) + '/khyber_spatio_temporal.csv'
-    data = pd.read_csv(fname, index_col=0)
+    fname = str(DATASET_DIR) + '/uib_spatio_temporal.csv'
+    data = pd.read_csv(fname)
     return data, torch.Tensor(np.array(data))[:,0:3], torch.Tensor(np.array(data)[:,-1])
 
-def load_train_test(test_year):
+def load_train_test():
         
-    data, x, y = load_khyber_data()
-    train_test_data = data[data['time'] < test_year+1]
-    x, y = torch.Tensor(np.array(train_test_data))[:,0:3], torch.Tensor(np.array(train_test_data)[:,-1])
+    data, x, y = load_uib_data()
+    #train_test_data = data[data['time'] < test_year+1]
+    data = data[data['time'] < 2001]
+    data['month'] = data['time'].rank(method='dense').astype('int')
+    train_test_data = data[data['month'] < 6]
+    x, y = torch.Tensor(np.array(train_test_data))[:,1:4], torch.Tensor(np.array(train_test_data)[:,-2])
     
     with torch.no_grad():
         stdx, meanx = torch.std_mean(x, dim=-2)
@@ -47,11 +48,12 @@ def load_train_test(test_year):
         stdy, meany = torch.std_mean(y)
         y_norm = (y - meany) / stdy
         
-    split_idx = len(np.where(train_test_data['time'] < test_year)[0])
-    test_idx = np.where(train_test_data['time'].astype('int') == test_year)[0]
+    #split_idx = len(np.where(train_test_data['time'] < test_year)[0])
+    #test_idx = np.where(train_test_data['time'].astype('int') == test_year)[0]
+    split_idx = len(np.where(train_test_data['month'] < 5)[0])
     x_train, y_train = x_norm[0:split_idx], y_norm[0:split_idx]
     x_test, y_test = x_norm[split_idx:], y_norm[split_idx:]
-    return train_test_data, x_train, y_train, x_test, y_test, meany, stdy
+    return train_test_data, x_train, y_train, x_test, y_test, meany, stdy, x_norm, y
     
 def parse_args(argv):
     
@@ -65,7 +67,7 @@ def parse_args(argv):
         
         ## Training options
         
-            'model'         : 'Non-Stationary',        # 'Stationary' / 'Non-stationary'
+            'model'         : 'Stationary',        # 'Stationary' / 'Non-stationary'
             'lr'            : '1e-2',              # learning rate          
             'max_iters'     : 1000,
             'threshold'     : 1e-6,                # improvement after which to stop
@@ -96,16 +98,15 @@ if __name__ == "__main__":
     max_cg_iterations = 4000
     
     #### Loading and prep data
-    test_year = 2004
     
-    data, x_train, y_train, x_test, y_test, meany, stdy = load_train_test(test_year)
+    data, x_train, y_train, x_test, y_test, meany, stdy, x_norm, y = load_train_test()
     
     num_inducing = 500  
-    z = torch.tensor(pm.gp.util.kmeans_inducing_points(num_inducing, np.array(x_train)))
-
+    #z = torch.tensor(pm.gp.util.kmeans_inducing_points(num_inducing, np.array(x_train)))
+    z = None
     ## Initialising model-set up and prior settings
     
-    if args['model'] == 'Non-stationary':
+    if args['model'] == 'Non-Stationary':
         
         prior = LogNormalPriorProcess(input_dim=2, active_dims=(0,1)).to(device)
             #### change the prior settings here if desired
@@ -140,7 +141,7 @@ if __name__ == "__main__":
     model.train()
     likelihood.train()
     
-    n_iter = 20
+    n_iter = 500
      
     optimizer = torch.optim.Adam(model.parameters(), lr=0.015)  
     mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
@@ -165,7 +166,7 @@ if __name__ == "__main__":
     model.eval()
     likelihood.eval()
     
-    if args['model'] == 'Non-stationary':
+    if args['model'] == 'Non-Stationary':
         pred_y_test = likelihood(model.predict(x_test)) 
     else:
         pred_y_test = likelihood(model(x_test)) 
@@ -175,48 +176,49 @@ if __name__ == "__main__":
     
     ## Metrics
     rmse_test = rmse(y_mean, y_test, stdy)
-    nlpd_test = nlpd(pred_y_test, y_test, stdy)
+    nlpd_test = negative_log_predictive_density(y_test, y_mean, y_var)
     
     print('RMSE test =  ' + str(rmse_test))
     print('NLPD test = ' + str(nlpd_test))
     
-    ### Pred full
+    # ### Pred full
     
     # if args['model'] == 'Non-stationary':
     #     pred_f = likelihood(model.predict(x_norm))
     # else:
-    #     pred_f = likelihood(model(x))
+    #     pred_f = likelihood(model(x_norm))
     
     # f_mean = pred_f.loc.detach()
     # f_var = pred_f.covariance_matrix.diag().detach()
     
-    #### Viz
+    # ### Viz
     
-    # #data['time'] = data.time.astype('int')
-    # df = data.set_index(['lat', 'lon', 'time']) ## with ground truth tp
-    # #df_recon['tp'] = f_mean*stdy + meany   ## overwrite with predictions
+    # df = data.set_index(['lat', 'lon', 'time','month']) ## with ground truth tp
+    # df['tp'] = f_mean*stdy + meany   ## overwrite with predictions
 
-    # years = [2000, 2001, 2002, 2003, 2004]
-    # plt.figure(figsize=(10,3))
+    # fig = plt.figure(figsize=(10,5))
     
-    # for i in [0,1,2,3]:
+    # for i in [1,2,3,4, 5]:
         
-    #     sub = df.xs(years[i], level=2)
+    #     sub = df.xs(i, level=3)
     #     da = sub.to_xarray()
         
-    #     ax = plt.subplot(1,4,i+1,projection=ccrs.PlateCarree())
+    #     ax = plt.subplot(1,5,i,projection=ccrs.PlateCarree())
     #     ax.set_extent([71, 83, 30, 38])
-    #     g = da.tp.plot(vmin=0, vmax=7,cbar_kwargs={
-    #             "label": "Precipitation [mm/day]",
-    #             "extend": "neither", "pad": 0.10})
+    #     g = da.tp.plot(vmin=0, vmax=7, add_colorbar=False)
     #     g.cmap.set_under("white")
-    #     g.colorbar.vmin = 0
-    #     g.colorbar.vmax = 6
-    #     gl = ax.gridlines(draw_labels=True)
-    #     gl.top_labels = False
-    #     gl.right_labels = False
-    #     ax.set_xlabel("Longitude")
-    #     ax.set_ylabel("Latitude")
-    #     plt.show()
+    #     ax.set_axis_off()
+    #     plt.title('Stationary Kernel: SE x PER + SE')
+    # cbar_ax = fig.add_axes([0.17, 0.17, 0.65, 0.04])   
+    # fig.colorbar(g, cax=cbar_ax, orientation="horizontal")
+
+        
+    #     #g.colorbar.vmin = 0
+    #     #g.colorbar.vmax = 6
+        #gl = ax.gridlines(draw_labels=True)
+        #gl.top_labels = False
+        #gl.right_labels = False
+        #ax.set_xlabel("Longitude")
+        #ax.set_ylabel("Latitude")
    
     

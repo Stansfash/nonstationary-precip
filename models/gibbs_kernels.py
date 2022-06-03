@@ -265,7 +265,7 @@ class InducingGibbsKernel(gpytorch.kernels.InducingPointKernel):
         else:
             return covar
 
-class InducingGibbsKernel(gpytorch.kernels.InducingPointKernel):
+class InducingGibbsKernelST(gpytorch.kernels.InducingPointKernel):
     """Wrapper for Gibbs Kernel for SGPR."""
     def __init__(
         self,

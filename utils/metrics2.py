@@ -6,7 +6,7 @@ Utilities for computation of metrics
 """
 
 import torch
-# from prettytable import PrettyTable
+from prettytable import PrettyTable
 
 def print_trainable_param_names(model):
 
@@ -42,7 +42,7 @@ def nlpd(Y_test_pred, Y_test, Y_std):
     
       lpd = Y_test_pred.log_prob(Y_test)
       # return the average
-      avg_lpd_rescaled = lpd.detach()/len(Y_test) #- torch.log(Y_std)
+      avg_lpd_rescaled = lpd.detach()/len(Y_test) - torch.log(Y_std)
       return -avg_lpd_rescaled
   
 

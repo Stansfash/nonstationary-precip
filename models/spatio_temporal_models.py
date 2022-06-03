@@ -9,7 +9,7 @@ Stationary and Non-stationary case
 import math
 import torch
 import gpytorch
-from models.gibbs_kernels import GibbsKernel, GibbsSafeScaleKernel, InducingGibbsKernel
+from models.gibbs_kernels import GibbsKernel, GibbsSafeScaleKernel, InducingGibbsKernelST
 from utils import functional as fn
 from gpytorch.kernels import ScaleKernel, PeriodicKernel, RBFKernel, InducingPointKernel
 from gpytorch.constraints import GreaterThan
@@ -38,7 +38,7 @@ class SparseSpatioTemporal_Nonstationary(gpytorch.models.ExactGP):
     def __init__(self, train_x, train_y, likelihood, prior, z, num_dim=1):
         super().__init__(train_x, train_y, likelihood)
         self.mean_module = gpytorch.means.ZeroMean()
-        self.spatial_covar_module = GibbsSafeScaleKernel(InducingGibbsKernel(GibbsKernel(lengthscale_prior=prior, active_dims=(0,1)), inducing_points = z, likelihood=likelihood, active_dims=(1,2)), active_dims=(1,2))
+        self.spatial_covar_module = GibbsSafeScaleKernel(InducingGibbsKernelST(GibbsKernel(lengthscale_prior=prior, active_dims=(0,1)), inducing_points = z, likelihood=likelihood, active_dims=(1,2)), active_dims=(1,2))
         self.temporal_covar_module = InducingPointKernel(ScaleKernel(RBFKernel(active_dims=(0))*PeriodicKernel(active_dims=(0)),
                                                  outputscale_constraint=GreaterThan(7), active_dims=0), inducing_points=self.spatial_covar_module.base_kernel.inducing_points, likelihood=likelihood, active_dims=(0))
         self.temporal_covar_module.inducing_points.requires_grad = False
