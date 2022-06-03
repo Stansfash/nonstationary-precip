@@ -30,7 +30,7 @@ kernel1 = ScaleKernel(RBFKernel()*PeriodicKernel())
 kernel2 = ScaleKernel(MaternKernel(0.5)*PeriodicKernel())
 '''
 
-for random_state in range(1):
+for random_state in range(10):
     print('random_state = ', random_state)
 
     df = pd.read_csv(filepath)
@@ -44,15 +44,15 @@ for random_state in range(1):
     y_tr, bc_param = scipy.stats.boxcox(y + 0.001)
     y_tr = torch.Tensor(y_tr)
 
-    stdy_tr, _ = torch.std_mean(y_tr)
-    stdy, _ = torch.std_mean(y_tr)
+    #stdy_tr = torch.Tensor(np.ones(len(y)))
+    stdy = 1.
 
     train_n = int(floor(0.75 * len(X)))
     train_x = X[:train_n, :].contiguous()
-    train_y = y_tr[:train_n].contiguous()
+    train_y = y[:train_n].contiguous()
 
     test_x = X[train_n:, :].contiguous()
-    test_y = y_tr[train_n:].contiguous()
+    test_y = y[train_n:].contiguous()
 
     if torch.cuda.is_available():
         train_x, train_y, test_x, test_y, X = train_x.cuda(), train_y.cuda(), test_x.cuda(), test_y.cuda(), X.cuda()
@@ -114,8 +114,8 @@ for random_state in range(1):
     test_y_tr = torch.Tensor(inv_boxcox(test_y, bc_param))
 
     ## Metrics
-    rmse_test = rmse(y_mean_tr, test_y_tr, stdy)
-    nlpd_test = nlpd(pred_y_test, test_y, stdy_tr)
+    rmse_test = rmse(y_mean, test_y, stdy)
+    nlpd_test = nlpd(pred_y_test, test_y, stdy)
 
     print(f"RMSE: {rmse_test.item()}, NLPD: {nlpd_test.item()}")
     rmses.append(rmse_test.item())

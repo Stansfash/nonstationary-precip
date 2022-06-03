@@ -14,7 +14,7 @@ num_output_dims = 10
 
 class ToyDeepGPHiddenLayer(DeepGPLayer):
     
-    def __init__(self, input_dims, output_dims, num_inducing=394*5, mean_type='constant'):
+    def __init__(self, input_dims, output_dims, num_inducing=394*4, mean_type='constant'):
         if output_dims is None:
             inducing_points = torch.randn(num_inducing, input_dims)
             batch_shape = torch.Size([])
@@ -30,7 +30,7 @@ class ToyDeepGPHiddenLayer(DeepGPLayer):
             self,
             inducing_points,
             variational_distribution,
-            learn_inducing_locations=True)
+            learn_inducing_locations=False)
 
         super(ToyDeepGPHiddenLayer, self).__init__(variational_strategy, input_dims, output_dims)
 
@@ -139,7 +139,7 @@ class DeepGP3(DeepGP):
                 mus.append(preds.mean)
                 variances.append(preds.variance)
                 lls.append(self.likelihood.log_marginal(y_batch, self(x_batch)))
-        return torch.cat(mus, dim=-1), torch.cat(variances, dim=-1), torch.cat(lls, dim=-1)
+        return preds, torch.cat(mus, dim=-1), torch.cat(variances, dim=-1), torch.cat(lls, dim=-1)
 
 
 class DeepGP5(DeepGP):
@@ -180,7 +180,7 @@ class DeepGP5(DeepGP):
                 mus.append(preds.mean)
                 variances.append(preds.variance)
                 lls.append(self.likelihood.log_marginal(y_batch, self(x_batch)))
-        return torch.cat(mus, dim=-1), torch.cat(variances, dim=-1), torch.cat(lls, dim=-1)
+        return preds, torch.cat(mus, dim=-1), torch.cat(variances, dim=-1), torch.cat(lls, dim=-1)
 
 
 class ExactGPModel(gpytorch.models.ExactGP):

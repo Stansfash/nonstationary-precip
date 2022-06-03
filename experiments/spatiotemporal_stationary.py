@@ -15,6 +15,7 @@ from sklearn.utils import shuffle
 import scipy.stats
 from scipy.special import inv_boxcox
 from utils.metrics import nlpd, rmse
+from gpytorch.constraints import GreaterThan
 
 filepath = 'data/uib_2000_2010_tp.csv'
 
@@ -33,14 +34,14 @@ y_tr, bc_param = scipy.stats.boxcox(y)
 y_tr = torch.Tensor(y_tr)
 
 stdy_tr, _ = torch.std_mean(y_tr)
-stdy, _ = torch.std_mean(y_tr)
+stdy, _ = torch.std_mean(y)
 
 train_n = 394*4
 train_x = X[:train_n, :].contiguous()
-train_y = y_tr[:train_n].contiguous()
+train_y = y[:train_n].contiguous()
 
 test_x = X[train_n:, :].contiguous()
-test_y = y [train_n:].contiguous()
+test_y = y[train_n:].contiguous()
 
 if torch.cuda.is_available():
     train_x, train_y, test_x, test_y, X = train_x.cuda(), train_y.cuda(), test_x.cuda(), test_y.cuda(), X.cuda()
@@ -100,7 +101,7 @@ y_var_tr = torch.Tensor(inv_boxcox(y_var + y_mean, bc_param,)) - y_mean_tr
 test_y_tr = torch.Tensor(inv_boxcox(test_y, bc_param))
 
 ## Metrics
-rmse_test = rmse(y_mean_tr, test_y_tr, stdy)
+rmse_test = rmse(y_mean, test_y, stdy)
 nlpd_test = nlpd(pred_y_test, test_y, stdy_tr)
 
 print(f"RMSE: {rmse_test.item()}, NLPD: {nlpd_test.item()}")

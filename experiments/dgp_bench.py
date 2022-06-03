@@ -17,7 +17,7 @@ from utils.metrics import nlpd, rmse
 
 num_epochs = 200
 num_samples = 10
-num_layers = 3
+num_layers = 2
 filepath = 'data/uib_jan2000_tp.csv'
 #filepath = 'data/uib_lat32_lon81_tp.csv'
 
@@ -27,7 +27,6 @@ print('num_layers = ', num_layers)
 
 rmses = []
 nlpds = []
-
 
 for random_state in range(10):
     print('random_state = ', random_state)
@@ -43,15 +42,15 @@ for random_state in range(10):
     y_tr, bc_param = scipy.stats.boxcox(y)
     y_tr = torch.Tensor(y_tr)
 
-    stdy_tr, _ = torch.std_mean(y_tr)
-    stdy, _ = torch.std_mean(y)
+    stdy_tr = 1. #torch.std_mean(y_tr)
+    stdy = 1. #torch.std_mean(y)
 
     train_n = int(floor(0.80 * len(X)))
     train_x = X[:train_n, :].contiguous()
-    train_y = y_tr[:train_n].contiguous()
+    train_y = y[:train_n].contiguous()
 
     test_x = X[train_n:, :].contiguous()
-    test_y = y_tr[train_n:].contiguous()
+    test_y = y[train_n:].contiguous()
 
     if torch.cuda.is_available():
         train_x, train_y, test_x, test_y = train_x.cuda(), train_y.cuda(), test_x.cuda(), test_y.cuda()
@@ -88,6 +87,7 @@ for random_state in range(10):
                 optimizer.zero_grad()
                 output = model(x_batch)
                 loss = -mll(output, y_batch)
+                print(loss)
                 loss.backward()
                 optimizer.step()
                 minibatch_iter.set_postfix(loss=loss.item())
@@ -104,33 +104,30 @@ for random_state in range(10):
 
     # Inverse transform predictions
     # pred_y_test_tr = torch.Tensor(inv_boxcox(pred_y_test, bc_param))
-    y_mean_tr = torch.Tensor(inv_boxcox(y_means, bc_param))
+    #y_mean_tr = torch.Tensor(inv_boxcox(y_means, bc_param))
     # y_var_tr = torch.Tensor(inv_boxcox(y_var + y_mean, bc_param,)) - y_mean_tr
-    test_y_tr = torch.Tensor(inv_boxcox(test_y, bc_param))
+    #test_y_tr = torch.Tensor(inv_boxcox(test_y, bc_param))
 
     ## Metrics
-    rmse_test = rmse(y_mean_tr, test_y_tr, stdy)
+    rmse_test = rmse(y_means, test_y, stdy)
     nlpd_test = nlpd(pred_y, test_y, stdy_tr).mean()
 
     print(f"RMSE: {rmse_test.item()}, NLPD: {nlpd_test.item()}")
     rmses.append(rmse_test.item())
     nlpds.append(nlpd_test.item())
 
-    '''
     plt_dataset = TensorDataset(X, y)
     plt_loader = DataLoader(plt_dataset, batch_size=1024)
     plt_pred_y, plt_y_means, plt_y_var, plt_test_lls = model.predict(plt_loader)
-
     
-    df1 = pd.DataFrame()
-    df1['pred'] = plt_y_means.mean(axis=0)
-    df1['var'] =  np.sqrt(plt_y_var.mean(axis=0))
-    df1['lat'] = data[:,1]
-    df1['lon'] = data[:,0]
-    #df1['time'] = data[:,0]
-    #df1.to_csv('data/DGP'+ str('num_layers')+'_'+ str(num_samples)+'samples_uib_32lat_81lon.csv')
-    df1.to_csv('data/DGP'+ str('num_layers')'_transform_uib_jan2000.csv')
-    '''
+df1 = pd.DataFrame()
+df1['pred'] = plt_y_means.mean(axis=0)
+df1['var'] =  np.sqrt(plt_y_var.mean(axis=0))
+df1['lat'] = data[:,1]
+df1['lon'] = data[:,0]
+#df1['time'] = data[:,0]
+#df1.to_csv('data/DGP'+ str('num_layers')+'_'+ str(num_samples)+'samples_uib_32lat_81lon.csv')
+df1.to_csv('data/DGP'+ str('num_layers')+'_uib_jan2000.csv')
 
 print(np.mean(rmses), '±', np.std(rmses)/np.sqrt(10))
 print(np.mean(nlpds), '±', np.std(nlpds)/np.sqrt(10))

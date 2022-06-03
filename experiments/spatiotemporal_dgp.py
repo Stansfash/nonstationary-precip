@@ -35,12 +35,15 @@ y = data[:394*5, -1]
 y_tr, bc_param = scipy.stats.boxcox(y + 0.001)
 y_tr = torch.Tensor(y_tr)
 
+stdy_tr, _ = torch.std_mean(y_tr)
+stdy, _ = torch.std_mean(y)
+
 train_n = 394*4
 train_x = X[:train_n, :].contiguous()
-train_y = y_tr[:train_n].contiguous()
+train_y = y[:train_n].contiguous()
 
 test_x = X[train_n:, :].contiguous()
-test_y = y [train_n:].contiguous()
+test_y = y[train_n:].contiguous()
 
 if torch.cuda.is_available():
     train_x, train_y, test_x, test_y = train_x.cuda(), train_y.cuda(), test_x.cuda(), test_y.cuda()
@@ -94,16 +97,32 @@ def sqrt_mean_squared_error(test_y, predicted_mean):
 test_dataset = TensorDataset(test_x, test_y)
 test_loader = DataLoader(test_dataset, batch_size=1024)
 
+#### Metrics
 model.eval()
-predictive_means, predictive_variances, test_lls = model.predict(test_loader)
+test_dataset = TensorDataset(test_x, test_y)
+test_loader = DataLoader(test_dataset, batch_size=1024)
+
+model.eval()
+with torch.no_grad():
+    pred_y, y_means, y_var, test_lls = model.predict(test_loader)
 
 # Inverse transform predictions
-predictive_means_tr = torch.Tensor(inv_boxcox(predictive_means, bc_param))
-vanilla_variances = torch.Tensor(np.ones((len(predictive_variances), len(predictive_variances[0]))))
+# pred_y_test_tr = torch.Tensor(inv_boxcox(pred_y_test, bc_param))
+# y_mean_raw = torch.Tensor(inv_boxcox(y_means, bc_param))
+# y_var_tr = torch.Tensor(inv_boxcox(y_var + y_mean, bc_param,)) - y_mean_tr
+# test_y_raw = torch.Tensor(inv_boxcox(test_y, bc_param))
 
-rmse = sqrt_mean_squared_error(test_y, predictive_means_tr)
-nlpd = negative_log_predictive_density(test_y, predictive_means_tr, vanilla_variances)
+## Metrics
+rmse_test = rmse(y_mean_raw, test_y_raw, stdy)
+nlpd_test = nlpd(pred_y, test_y, stdy_tr).mean()
 
-print(f"RMSE: {rmse.item()}, NLPD: {nlpd.item()}")
+print(f"RMSE: {rmse_test.item()}, NLPD: {nlpd_test.item()}")
+
+df1 = pd.DataFrame()
+df1['pred'] = y_means.mean(axis=0)
+df1['var'] =  np.sqrt(_y_var.mean(axis=0))
+df1['lat'] = data[:,2]
+df1['lon'] = data[:,1]
+df1.to_csv('data/DGP'+ str('num_layers')+'_uib_may2000.csv')
 
 
