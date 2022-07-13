@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Khyber Spatio-Temporal model
+UIB Spatio-Temporal model
 
 """
 
@@ -20,7 +20,7 @@ from models.gibbs_kernels import LogNormalPriorProcess, PositivePriorProcess, Gi
 from models.spatio_temporal_models import SpatioTemporal_Stationary, SparseSpatioTemporal_Nonstationary
 from gpytorch.constraints import GreaterThan
 
-from utils.config import BASE_SEED, EPSILON, DATASET_DIR
+from utils.config import BASE_SEED, EPSILON, DATASET_DIR, RESULTS_DIR
 from utils.metrics import rmse, nlpd, negative_log_predictive_density,get_trainable_param_names
 
 gpytorch.settings.cholesky_jitter(EPSILON)
@@ -183,34 +183,38 @@ if __name__ == "__main__":
     
     # ### Pred full
     
-    # if args['model'] == 'Non-stationary':
-    #     pred_f = likelihood(model.predict(x_norm))
-    # else:
-    #     pred_f = likelihood(model(x_norm))
+    if args['model'] == 'Non-stationary':
+        pred_f = likelihood(model.predict(x_norm))
+    else:
+        pred_f = likelihood(model(x_norm))
     
-    # f_mean = pred_f.loc.detach()
-    # f_var = pred_f.covariance_matrix.diag().detach()
+    f_mean = pred_f.loc.detach()
+    f_var = pred_f.covariance_matrix.diag().detach()
     
     # ### Viz
-    
-    # df = data.set_index(['lat', 'lon', 'time','month']) ## with ground truth tp
-    # df['tp'] = f_mean*stdy + meany   ## overwrite with predictions
+    fname = str(RESULTS_DIR) + '/dgp2_spatio_temporal_means_sigmas.csv'
+    data = pd.read_csv()
+    df = data.set_index(['lat', 'lon', 'time','month']) ## with ground truth tp
+    #df['tp'] = f_mean*stdy + meany   ## overwrite with predictions
+    months = ['jan', 'feb', 'mar', 'apr', 'may']
 
-    # fig = plt.figure(figsize=(10,5))
+    fig = plt.figure(figsize=(10,5))
     
-    # for i in [1,2,3,4, 5]:
+    for i in [1,2,3,4, 5]:
         
-    #     sub = df.xs(i, level=3)
-    #     da = sub.to_xarray()
+        sub = df.xs(i, level=3)
+        da = sub.to_xarray()
         
-    #     ax = plt.subplot(1,5,i,projection=ccrs.PlateCarree())
-    #     ax.set_extent([71, 83, 30, 38])
-    #     g = da.tp.plot(vmin=0, vmax=7, add_colorbar=False)
-    #     g.cmap.set_under("white")
-    #     ax.set_axis_off()
-    #     plt.title('Stationary Kernel: SE x PER + SE')
-    # cbar_ax = fig.add_axes([0.17, 0.17, 0.65, 0.04])   
-    # fig.colorbar(g, cax=cbar_ax, orientation="horizontal")
+        ax = plt.subplot(1,5,i,projection=ccrs.PlateCarree())
+        ax.set_extent([71, 83, 30, 38])
+        g = da.tp.plot(vmin=0, vmax=7, add_colorbar=False)
+        g.cmap.set_under("white")
+        ax.set_axis_off()
+        plt.title(months[i-1])
+    #plt.suptitle('Stationary Kernel: SE x PER + SE')
+    plt.suptitle('Ground Truth')
+    cbar_ax = fig.add_axes([0.15, 0.15, 0.65, 0.04])   
+    fig.colorbar(g, cax=cbar_ax, orientation="horizontal")
 
         
     #     #g.colorbar.vmin = 0

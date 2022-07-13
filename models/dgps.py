@@ -10,11 +10,11 @@ from gpytorch.distributions import MultivariateNormal
 from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.models.deep_gps import DeepGPLayer, DeepGP
 
-num_output_dims = 10
+num_output_dims = 5
 
 class ToyDeepGPHiddenLayer(DeepGPLayer):
     
-    def __init__(self, input_dims, output_dims, num_inducing=394*4, mean_type='constant'):
+    def __init__(self, input_dims, output_dims, num_inducing=250, mean_type='constant'):
         if output_dims is None:
             inducing_points = torch.randn(num_inducing, input_dims)
             batch_shape = torch.Size([])

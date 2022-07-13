@@ -8,6 +8,7 @@ import numpy as np
 import math
 import torch 
 import gpytorch
+import scipy
 import pandas as pd
 import matplotlib.pylab as plt
 from utils.metrics import get_trainable_param_names
@@ -37,23 +38,23 @@ class KhyberTemporalStat(gpytorch.models.ExactGP):
         self.mean_module = gpytorch.means.ConstantMean()
         self.covar_module = ScaleKernel(RBFKernel()*PeriodicKernel(), outputscale_constraint=GreaterThan(7
             ))
-        
-        
     def forward(self, x):
         mean = self.mean_module(x)
         covar = self.covar_module(x)
         return gpytorch.distributions.MultivariateNormal(mean, covar)
     
-
 if __name__ == "__main__":
     
     x, y = load_khyber_timeseries()
+    
+    y_tr, bc_param = scipy.stats.boxcox(y)
     
     with torch.no_grad():
         stdx, meanx = torch.std_mean(x)
         x_norm = (x -  meanx) / stdx
         stdy, meany = torch.std_mean(y)
-        y_norm = (y - meany) / stdy
+        #y_norm = (y - meany) / stdy
+        y_norm = y_tr
         
     num_train = math.ceil(80/100 * y.shape[0])
     idx = np.arange(0, y.shape[0], 1)

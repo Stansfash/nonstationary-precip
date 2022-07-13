@@ -3,8 +3,8 @@
 import pandas as pd
 import scipy as sp
 import torch
+import math
 from torch.utils.data import TensorDataset
-
 
 def download_data(filepath):
     df = pd.read_csv(filepath)
@@ -12,10 +12,14 @@ def download_data(filepath):
     return data
 
 def prep_inputs(data):
-    X = data[:, 1:-1]
-    X = X - X.min(0)[0]
-    X = 2 * (X / X.max(0)[0]) - 1
-    return X
+    
+    # X = data[:, 1:-1]
+    # X = X - X.min(0)[0]
+    # X = 2 * (X / X.max(0)[0]) - 1
+    x = data[:,:-1]
+    stdx, meanx = torch.std_mean(x, dim=-2)
+    x_norm = (x -  meanx) / stdx
+    return x_norm
 
 def prep_outputs(data):
     y = data[:, -1]
@@ -24,8 +28,23 @@ def prep_outputs(data):
     # y = sp.special.inv_boxcox(y_tr, bc_param)
     return y_tr, bc_param
 
-def test_train_split(X, y):
-    train_n = int(floor(0.8 * len(X)))
+def box_cox_transform(data):
+    
+    return prep_inputs(data), prep_outputs(data)
+
+def whitening_transform(data):
+    
+    x = data[:,:-1]
+    y = data[:,-1]
+    stdx, meanx = torch.std_mean(x, dim=-2)
+    x_norm = (x -  meanx) / stdx
+    stdy, meany = torch.std_mean(y)
+    y_norm = (y - meany) / stdy
+    return x_norm, y_norm, meanx, stdx, meany, stdy 
+
+def train_test_split(X, y, train_prop):
+    
+    train_n = int(math.floor(train_prop * len(X)))
     train_x = X[:train_n, :].contiguous()
     train_y = y[:train_n].contiguous()
     test_x = X[train_n:, :].contiguous()
@@ -35,16 +54,14 @@ def test_train_split(X, y):
     
 if __name__ == "__main__":
     
-    filepath = 'khyber_2000_2010_tp.csv'
+    filepath = 'data/uib_spatial.csv'
     data = download_data(filepath)
     
-    X = prep_inputs(data)
-    y , boxcox_param = prep_outputs(data)
     
-    train_x, train_y, test_x, test_y = test_train_split(X, y)
+#     train_x, train_y, test_x, test_y = test_train_split(X, y)
     
-    if torch.cuda.is_available():
-        train_x, train_y, test_x, test_y = train_x.cuda(), train_y.cuda(), test_x.cuda(), test_y.cuda()
+#     if torch.cuda.is_available():
+#         train_x, train_y, test_x, test_y = train_x.cuda(), train_y.cuda(), test_x.cuda(), test_y.cuda()
     
-    train_dataset = TensorDataset(train_x, train_y)
+#     train_dataset = TensorDataset(train_x, train_y)
     
