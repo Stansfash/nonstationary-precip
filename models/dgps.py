@@ -4,15 +4,15 @@ import torch
 import gpytorch
 
 from gpytorch.means import ConstantMean, LinearMean
-from gpytorch.kernels import RBFKernel, ScaleKernel,  PeriodicKernel
+from gpytorch.kernels import RBFKernel, ScaleKernel
 from gpytorch.variational import VariationalStrategy, CholeskyVariationalDistribution
 from gpytorch.distributions import MultivariateNormal
 from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.models.deep_gps import DeepGPLayer, DeepGP
 
-num_output_dims = 5
+num_output_dims = 2
 
-class ToyDeepGPHiddenLayer(DeepGPLayer):
+class DeepGPHiddenLayer(DeepGPLayer):
     
     def __init__(self, input_dims, output_dims, num_inducing=250, mean_type='constant'):
         if output_dims is None:
@@ -30,9 +30,12 @@ class ToyDeepGPHiddenLayer(DeepGPLayer):
             self,
             inducing_points,
             variational_distribution,
-            learn_inducing_locations=False)
+            learn_inducing_locations=True)
 
-        super(ToyDeepGPHiddenLayer, self).__init__(variational_strategy, input_dims, output_dims)
+        super(DeepGPHiddenLayer, self).__init__(variational_strategy, input_dims, output_dims)
+        
+        if torch.cuda.is_available():
+            variational_strategy.inducing_points = variational_strategy.inducing_points
 
         if mean_type == 'constant':
             self.mean_module = ConstantMean(batch_shape=batch_shape)
@@ -65,28 +68,33 @@ class ToyDeepGPHiddenLayer(DeepGPLayer):
             x = torch.cat([x] + processed_inputs, dim=-1)
 
         return super().__call__(x, are_samples=bool(len(other_inputs)))
-
-
-class DeepGP2(DeepGP):
     
-    def __init__(self, train_x_shape):
-        hidden_layer = ToyDeepGPHiddenLayer(
+class DeepGP(DeepGP):
+    
+    def __init__(self, num_layers, train_x_shape):
+        
+        hidden_layer = DeepGPHiddenLayer(
             input_dims=train_x_shape[-1],
             output_dims=num_output_dims,
             mean_type='linear')
 
-        last_layer = ToyDeepGPHiddenLayer(
+        last_layer = DeepGPHiddenLayer(
             input_dims=hidden_layer.output_dims,
             output_dims=None,
             mean_type='constant')
+        
         super().__init__()
-        self.hidden_layer = hidden_layer
+        
+        self.layers = torch.nn.ModuleList([hidden_layer for i in range(num_layers)])
         self.last_layer = last_layer
         self.likelihood = GaussianLikelihood()
 
     def forward(self, inputs):
-        hidden_rep1 = self.hidden_layer(inputs)
-        output = self.last_layer(hidden_rep1)
+        
+        hidden_rep = inputs
+        for layer in self.layers:
+            hidden_rep = layer(hidden_rep)
+        output = self.last_layer(hidden_rep)
         return output
 
     def predict(self, test_loader):
@@ -102,87 +110,6 @@ class DeepGP2(DeepGP):
 
         return  preds, torch.cat(mus, dim=-1), torch.cat(variances, dim=-1), torch.cat(lls, dim=-1)
 
-
-class DeepGP3(DeepGP):
-    def __init__(self, train_x_shape):
-        first_layer = ToyDeepGPHiddenLayer(
-            input_dims=train_x_shape[-1],
-            output_dims=num_output_dims,
-            mean_type='linear')
-        middle_layer = ToyDeepGPHiddenLayer(
-            input_dims= num_output_dims,
-            output_dims= num_output_dims,
-            mean_type='linear')
-        last_layer = ToyDeepGPHiddenLayer(
-            input_dims=middle_layer.output_dims,
-            output_dims=None,
-            mean_type='constant')
-        super().__init__()
-        self.first_layer = first_layer
-        self.middle_layer = middle_layer
-        self.last_layer = last_layer
-        self.likelihood = GaussianLikelihood()
-
-    def forward(self, inputs):
-        hidden_rep1 = self.first_layer(inputs)
-        hidden_rep2 = self.middle_layer(hidden_rep1)
-        output = self.last_layer(hidden_rep2)
-        return output
-
-    def predict(self, test_loader):
-        with torch.no_grad():
-            mus = []
-            variances = []
-            lls = []
-            for x_batch, y_batch in test_loader:
-                preds = self.likelihood(self(x_batch))
-                mus.append(preds.mean)
-                variances.append(preds.variance)
-                lls.append(self.likelihood.log_marginal(y_batch, self(x_batch)))
-        return preds, torch.cat(mus, dim=-1), torch.cat(variances, dim=-1), torch.cat(lls, dim=-1)
-
-
-class DeepGP5(DeepGP):
-    def __init__(self, train_x_shape):
-        first_layer = ToyDeepGPHiddenLayer(
-            input_dims=train_x_shape[-1],
-            output_dims=num_output_dims,
-            mean_type='linear')
-        middle_layer = ToyDeepGPHiddenLayer(
-            input_dims= num_output_dims,
-            output_dims= num_output_dims,
-            mean_type='linear')
-        last_layer = ToyDeepGPHiddenLayer(
-            input_dims=middle_layer.output_dims,
-            output_dims=None,
-            mean_type='constant')
-        super().__init__()
-        self.first_layer = first_layer
-        self.middle_layer = middle_layer
-        self.last_layer = last_layer
-        self.likelihood = GaussianLikelihood()
-
-    def forward(self, inputs):
-        hidden_rep1 = self.first_layer(inputs)
-        hidden_rep2 = self.middle_layer(hidden_rep1)
-        hidden_rep3 = self.middle_layer(hidden_rep2)
-        hidden_rep4 = self.middle_layer(hidden_rep3)
-        output = self.last_layer(hidden_rep4)
-        return output
-
-    def predict(self, test_loader):
-        with torch.no_grad():
-            mus = []
-            variances = []
-            lls = []
-            for x_batch, y_batch in test_loader:
-                preds = self.likelihood(self(x_batch))
-                mus.append(preds.mean)
-                variances.append(preds.variance)
-                lls.append(self.likelihood.log_marginal(y_batch, self(x_batch)))
-        return preds, torch.cat(mus, dim=-1), torch.cat(variances, dim=-1), torch.cat(lls, dim=-1)
-
-
 class ExactGPModel(gpytorch.models.ExactGP):
     def __init__(self, train_x, train_y, likelihood, kernel):
         super(ExactGPModel, self).__init__(train_x, train_y, likelihood)
@@ -193,3 +120,8 @@ class ExactGPModel(gpytorch.models.ExactGP):
         mean_x = self.mean_module(x)
         covar_x = self.covar_module(x)
         return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
+        
+   
+
+
+    

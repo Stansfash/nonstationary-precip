@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Spatio-Temporal Baseline Models
+Spatio-Temporal Models
 
 Stationary and Non-stationary case
 
