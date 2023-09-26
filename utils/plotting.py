@@ -8,18 +8,18 @@ import cartopy.crs as ccrs
 from utils.config import RESULTS_DIR
 from mpl_toolkits.basemap import Basemap
 
-def simple_plot(filepath='khyber_2000_2010_tp.csv'):
+def simple_plot(filepath='data/uib_spatial.csv'):
     """ Simple plot without cartopy """
     # import data
     df1 = pd.read_csv(filepath)
     df1 = df1.drop('Unnamed: 0', axis=1)
 
     # create 'DataArray'
-    df2 = df1.set_index(['lat', 'lon', 'time'])
+    df2 = df1.set_index(['lat', 'lon', 'tp'])
     da = df2.to_xarray()
 
     # select a date
-    ds = da.isel(time=50)
+    ds = da.isel(tp=50)
 
     # plot
     plt.figure()
@@ -72,19 +72,6 @@ def plot_uib_etopo_image():
     # draw meridians
     meridians = np.arange(72,82.5,2.5)
     m.drawmeridians(meridians,labels=[0,0,0,1],fontsize=11)
-    
-
-def plot_spatial_predicted_mean():
-    
-    dgp_mean = pd.read_csv()
-    
-    return;
-    
-    
-
-def plot_spati_temporal_means():
-    
-    return;
     
 
 

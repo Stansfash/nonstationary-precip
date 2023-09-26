@@ -30,9 +30,9 @@ transform = 'whitening' # or 'boxcox'
 #     data = pd.read_csv(fname, dtype=np.float64)
 #     return data, torch.Tensor(np.array(data))[:,0:2], torch.Tensor(np.array(data)[:,-1])
 
-num_epochs = 200
+num_epochs = 400
 num_samples = 3
-num_layers = 2
+num_layers = 4
 filepath = 'data/uib_spatial.csv'
 
 print('num_epochs = ', num_epochs)
@@ -42,7 +42,7 @@ print('num_layers = ', num_layers)
 rmses = []
 nlpds = []
 
-for random_state in range(1):
+for random_state in range(10):
     
     print('random_state = ', random_state)
 
@@ -56,38 +56,40 @@ for random_state in range(1):
         
     train_x, train_y, test_x, test_y = dp.train_test_split(x_tr, y_tr, 0.8)
 
-    train_dataset = TensorDataset(train_x, train_y)
-    train_loader = DataLoader(train_dataset, batch_size=315, shuffle=True)
-
     #### Model
     model = m.DeepGP(num_layers, train_x.shape)
-
+    mll = DeepApproximateMLL(VariationalELBO(model.likelihood, model, train_x.shape[-2]))
+    
     if torch.cuda.is_available():
          train_x, train_y, test_x, test_y = train_x.cuda(), train_y.cuda(), test_x.cuda(), test_y.cuda()
          model = model.cuda()
          model.likelihood = model.likelihood.cuda()
+         mll = mll.cuda()
+    
+    train_dataset = TensorDataset(train_x, train_y)
+    train_loader = DataLoader(train_dataset, batch_size=315, shuffle=True)
 
     #### Training
     model.train()
     optimizer = torch.optim.Adam([
         {'params': model.parameters()},
     ], lr=0.01)
-    mll = DeepApproximateMLL(VariationalELBO(model.likelihood, model, train_x.shape[-2]))
-
-    epochs_iter = tqdm.tqdm(range(num_epochs), desc="Epoch")
+   
+    epochs_iter = tqdm.tqdm(range(num_epochs), leave=True, position=0, desc="Epoch")
+    losses = []
     for i in epochs_iter:
         # Within each iteration, we will go over each minibatch of data
-        minibatch_iter = tqdm.tqdm(train_loader, desc="Minibatch", leave=False)
+        minibatch_iter = tqdm.tqdm(train_loader, position=0,desc="Minibatch", leave=True)
         for x_batch, y_batch in minibatch_iter:
             with gpytorch.settings.num_likelihood_samples(num_samples):
                 optimizer.zero_grad()
                 output = model(x_batch)
                 loss = -mll(output, y_batch)
                 #print(loss)
+                losses.append(loss)
                 loss.backward()
                 optimizer.step()
                 minibatch_iter.set_postfix(loss=loss.item())
-
 
     #### Metrics
 
